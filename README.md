@@ -1,6 +1,6 @@
 # GWAS-workshop
 
-This repositary containes handouts for a GWAS workshop. 
+This repositary containes data and handouts used for a GWAS workshop at PBI Kiel. 
 
 ## Reference 
 Kang HM, Sul JH, Service SK, Zaitlen NA, Kong SY, Freimer NB, Sabatti C, Eskin E. (2010) Variance component model to account for sample structure in genome-wide association studies. Nat. Genet. 42:348-54
