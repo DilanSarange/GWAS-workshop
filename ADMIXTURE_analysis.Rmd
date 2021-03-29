@@ -1,0 +1,138 @@
+---
+title: "ADMIXTURE Analysis"
+author: "Dilan Sarange"
+date: "3/28/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+https://github.com/DilanSarange/GWAS-workshop 
+
+## ADMIXTURE analysis
+We can estimate the ancestry of accessions using a large set of SNP genotype data set. 
+First, go to your working directory 
+
+```{bash }
+cd /mnt/HDD-08_5/GWAS_workshop/dilan/admixture
+ ```
+Admixture software can be downloaded from the following website;
+
+https://dalexander.github.io/admixture/binaries/admixture_linux-1.3.0.tar.gz 
+
+```{bash,results='hide'}
+# make sure you are in the correct directory 
+pwd
+# use wget to download the software 
+
+wget https://dalexander.github.io/admixture/binaries/admixture_linux-1.3.0.tar.gz 
+
+ # unzip 
+tar -xzf admixture_linux-1.3.0.tar.gz 
+```
+```{bash}
+# check the installation 
+
+cd dist/admixture_linux-1.3.0/
+
+ls -lhrt
+
+# test admixture software
+
+./admixture 
+
+# return to wd 
+cd ../../
+``` 
+## running admixture analysis
+Now let's run the admixture analysis. 
+
+admixture usage 
+
+./admixture <input_file> <K> --cv --B10  
+
+input_file should be a bed file 
+
+K= number of populations
+
+--cv cross-validation error 
+
+--B1000 1000 bootstraps (should be changed according to your requirements as a rule of thumb --B1000 is used )
+./admixture <>
+
+-j number of threads 
+
+we will run a bash loop for 4 populations 
+
+```{bash , results='hide'}
+
+for K in 2 3 4 5; do ./dist/admixture_linux-1.3.0/admixture -B3 Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.bed --cv $K -j2 | tee log${K}.out;done
+
+```
+
+let's check our output
+
+```{bash,results='hide'}
+ls -lhrt
+
+head Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.3.Q
+
+# cross validation error
+
+ grep -h CV log*.out | awk '{split($3,a,"=");split(a[2],b,")");print b[1]","$4}' > CV_error.csv
+
+```
+
+## Plotting data
+
+now open R or RStudio
+
+First, let's plot cross-validation errors
+```{r}
+# make sure you are in the correct directory
+
+CV<-read.csv("CV_error.csv",header = F)
+
+plot(CV$V1,CV$V2,xlab = "K",ylab = "Cross-validation error")
+
+
+```
+Next, let's plot ancestry coefficients of accessions
+
+```{r}
+# Load packages
+library(tidyverse)
+library(ggplot2)
+
+# read Q matrix
+K_5<-read.table("Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.5.Q",header = F)
+
+# read sample id
+id<-read.table("Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.fam",header = F)
+
+#combine id and Q
+K5_with_id<-cbind(id,K_5)
+
+# remove columns that are not necessary
+K5_with_id<-K5_with_id[,c(-2:-6)]
+
+# rename columns
+
+colnames(K5_with_id)<-c("id","Q1","Q2","Q3","Q4","Q5")
+
+# prepare data frame for plotting 
+K5_for_plot <- K5_with_id %>% 
+  gather('Population', 'Ancestry', Q1:Q5) %>% 
+  group_by(id) %>% 
+  mutate(likely_assignment = Population[which.max(Ancestry)],
+         assingment_prob = max(Ancestry)) %>% 
+  arrange(likely_assignment, desc(assingment_prob)) %>% 
+  ungroup() %>% 
+  mutate(id=forcats::fct_inorder(factor(id)))
+
+# plotting 
+ggplot(K5_for_plot, aes(id, Ancestry, fill = Population)) +
+  geom_col()
+
+```
+

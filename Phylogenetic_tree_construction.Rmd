@@ -1,0 +1,60 @@
+---
+title: "Phylogenetic tree construction"
+author: "Dilan Sarange"
+date: "3/29/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+https://github.com/DilanSarange/GWAS-workshop 
+
+## ml tree using iqtree 
+
+iqtree is a user freindly software to creat phylogenetic trees using maximum likelyhood algorythm. 
+http://www.iqtree.org/ 
+
+The software can be downloded from https://github.com/Cibiv/IQ-TREE/releases/download/v1.6.12/iqtree-1.6.12-Linux.tar.gz
+
+# step 1 
+
+First we convert our vcf file to PHYLIP,fasta, or nexus file format which are compatible to iqtree software. for that we use vcf2phylip software (https://github.com/edgardomortiz/vcf2phylip)
+
+```{bash,results='hide'}
+# download software from github 
+
+git clone https://github.com/edgardomortiz/vcf2phylip
+
+# conversion to phylip format 
+# -f -n flags can be used to creat fasta and nexus format files 
+
+ ./vcf2phylip/vcf2phylip.py -i Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.vcf.gz  -o Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2
+ 
+```
+
+# step 2
+
+let's run the phylogenetic tree 
+
+```{bash,results='hide'}
+# download software 
+
+wget https://github.com/Cibiv/IQ-TREE/releases/download/v1.6.12/iqtree-1.6.12-Linux.tar.gz 
+
+# unzip 
+
+tar -zxf iqtree-1.6.12-Linux.tar.gz
+
+# construct the phylogenetic tree 
+
+#./iqtree-1.6.12-Linux/bin/iqtree -s Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.min4.phy -nt AUTO 
+
+```
+We will not run this because it will take long time. this analysis will creat sevaral files. 
+
+.treefile: Can be visualized in iTOL (https://itol.embl.de/)
+
+
