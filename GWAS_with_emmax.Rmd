@@ -1,0 +1,186 @@
+---
+title: "GWAS with emmax"
+author: "Dilan Sarange"
+date: "3/29/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+https://github.com/DilanSarange/GWAS-workshop
+
+## EMMAX software 
+The EMMAX software employs a mixed-model approach. The variance components, sigma g^2, and sigma e^2 , are estimated only once in the whole genome level using restricted maximum likelihood (REML). Therefore, computationally EMMAX is very fast. 
+
+Let's download the software.
+
+
+```{bash,results='hide'}
+# download
+wget http://csg.sph.umich.edu//kang/emmax/download/emmax-intel-binary-20120210.tar.gz 
+
+# unzip
+
+tar -zxf emmax-intel-binary-20120210.tar.gz
+
+```
+
+## step 1 (Genotype file)
+
+Next, we need to prepare the genotype file suitable for emmax. EMMAX accepts transposed genotype files. We can use plink software to transpose the genotype file 
+
+```{bash,results='hide'}
+# transpose genotype file using plink 
+./plink --bfile Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2 --recode12 --output-missing-genotype 0 --transpose --out Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2
+
+```
+
+## step 2 (Phenotype file)
+
+Phenotype file should have three fields family ID (FAMID), individual ID (INDID) and phenotype. FAMID and INDID can be the same. Missing data are donated as NA. FAMID order should be matched with input genotype .fam ID order.  
+
+```{bash}
+# example
+head DTF_GWAS.phe
+
+head Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.fam 
+
+```
+
+## step 3 (Kinship matrix)
+
+Now let's create a genotype (SNP) based kinship matrix.
+
+emmax-kin-intel64 allows us to create kinship matrices using two methods; IBS matrix and BN (Balding-Nichols). BN is recommended by developers
+
+```{bash,results='hide'}
+# creating a kinship file 
+./emmax-kin-intel64 -v -d 10 Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2
+
+```
+-v : turn on verbose mode
+-d : precision of the kinship values (default : 10) 
+
+The output file suffix is .aBN.kinf 
+
+## step 4 (run association with co-variates(PC))
+
+For this, we use 10 PCs obtained from SNPrelate principal components analysis. 
+
+
+```{bash,results='hide'}
+ ./emmax-intel64 -v -d 10 -t Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2 -p DTF_GWAS.phe -k Quinoa_SNPs_biallelic_maxmiss0.95_minmeanDP8_maf0.05_PRUNED_10k_100_r0.2.aBN.kinf -c PCA_GWAS_workshop.cov -o DTF_emmax
+```
+This analysis creates several files 
+
+### .log : log file 
+
+
+```{bash}
+head DTF_emmax.log
+```
+
+### .reml REML output file
+```{bash}
+cat DTF_emmax.reml
+```
+These line represents;
+
+1: Log-likelihood with variance component
+
+2: Log-likelihood without variance component
+
+3: delta = sigma_e^2 / sigma_g^2 (Ratio between variance parameters)
+
+4: sigma_g^2 (genetic variance parameter)
+
+5: sigma_e^2 (residual variance parameter)
+
+6: The pseudo-heritability estimates. (Explained variance by the kinship matrix)
+
+### .ps SNP association file  
+```{bash}
+head DTF_emmax.ps 
+```
+This file has six columns and is essential to create manhattan plots
+
+These columns consist of;
+
+$1 SNP ID
+
+$2 Beta (effect of the allele 2 in the .tped file, usually it's the major allele)
+
+$3 SE(standard error of Beta) 
+
+$4 p-value
+
+
+## Manhattan plot and qq plot 
+
+We can create a manhattan plot using our .ps output file to visualize results. First, open R (or r studio)and make sure you are in the correct directory.   
+
+```{r}
+# loading packages 
+library(qqman)
+library(tidyverse)
+
+# load file 
+DTF_results<-read.table("DTF_emmax.ps",sep="\t",header=F)
+
+# change column header
+colnames(DTF_results)<-c("SNP","Beta","SE","P")
+
+# split SNP column into Chromosome (CHR) and positions (Pos) columns
+DTF_results_plot_data<-separate(DTF_results,SNP, into= c("CHR", "Pos"), sep = "_",remove = FALSE)
+
+# CHR and Pos should be numeric  
+DTF_results_plot_data$CHR<-as.numeric(DTF_results_plot_data$CHR)
+
+DTF_results_plot_data$Pos<-as.numeric(DTF_results_plot_data$Pos)
+
+# calculation of the p-value threshold 
+# bonferroni threshold: alpha/number of tests : 0.05/n
+
+0.05/26121
+
+#plotting a manhattan plot 
+#png("DTF_emmax.png",type="cairo",width=889,height=535,units="px")
+    manhattan(DTF_results_plot_data,chr="CHR",bp="Pos", snp="SNP", p="P",ylim=c(0,8), main ="DTF emmax", genomewideline = -log10(1.914169e-06), suggestiveline=FALSE, chrlabs=c("A1","A2","A3","A4","A5","A6","A7","A8","A9","B1","B2","B3","B4","B5","B6","B7","B8","B9"))
+    #dev.off()
+    
+    ```
+```{r}    
+# plotting qqplot 
+qq(DTF_results_plot_data$P, main = "Q-Q plot of DTF GWAS p-values") 
+```
+
+### Reference 
+Kang HM, Sul JH, Service SK, Zaitlen NA, Kong SY, Freimer NB, Sabatti C, Eskin E. (2010) Variance component model to account for sample structure in genome-wide association studies. Nat. Genet. 42:348-54
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
